@@ -2,8 +2,8 @@
 images/
 ml_challenge/
 images_train/
-images_test/
-images_test_sample/
+image_test/
+image_test_sample/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

@@ -1,28 +1,120 @@
 import os
 import pandas as pd
 import torch
-from transformers import LlavaNextProcessor, LlavaNextForConditionalGeneration
+from transformers import LlavaNextProcessor, LlavaNextForConditionalGeneration, pipeline, AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+from ok import generate_mistral
+import re
 from utils import download_images
 from constants import entity_unit_map
+from typing import Dict
+from tqdm import tqdm
+import gc
+import json
 from PIL import Image
 from tqdm import tqdm
 
-def predict(image_path: str, entity_name: str) -> str:
+def is_float(s):
+    return bool(re.match(r"^-?\d*(\.\d+)?$", s))
+
+
+def is_integer(s):
+    return bool(re.match(r"^-?\d+$", s))
+
+
+def check_number_type(s):
+    if is_integer(s):
+        return True
+    elif is_float(s):
+        return True
+    else:
+        return False
+
+
+def predict(
+    processor,
+    model,
+    image_var : Image, 
+    predict_out: str, 
+    entity_unit_map: Dict[str, str]
+) -> str:  
+    conversation = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "image"}, 
+                {"type": "text", "text": f"  Extract all product specifications from the image, including details like dimensions, weight, material, color, features, model number, manufacturer, and any other relevant technical information. Ensure that the text is accurately identified and categorized, ignoring any decorative elements or branding logos."},
+            ],
+        },
+    ]
+
+    prompt = processor.apply_chat_template(
+        conversation, 
+        add_generation_prompt=True
+    )
+    inputs = processor(prompt, image_var, return_tensors="pt").to("cuda:0")
+
+    output = model.generate(**inputs, max_new_tokens=700)
+
+    decoded_output = processor.decode(output[0], skip_special_tokens=True)
+    print(str(decoded_output).split("[/INST]")[-1])
+
+    decoded_out = str(decoded_output).split("[/INST]")[-1]
     
-    pass
+    print(decoded_out)
+
+    prompt_model = f" \n {decoded_out} \nOutput the information relevant to {predict_out} in the text given above, output only information and integers should be upto 3 decimal places.Output only one answer in form of the proper unit mentioned in {entity_unit_map[predict_out]}. Output in json format with unit as key and value.If not found then output " ""
+
+    model_id = "microsoft/Phi-3-mini-4k-instruct"
+    tokenizer = AutoTokenizer.from_pretrained("microsoft/Phi-3-mini-4k-instruct")
+    
+    conversation = [
+        {"role": "user", "content": f"{prompt_model}"}
+    ]
+
+    # format and tokenize the tool use prompt 
+    inputs = tokenizer.apply_chat_template(
+        conversation,
+        add_generation_prompt=True,
+        return_dict=True,
+        return_tensors="pt",
+    )
+
+    model_mistral = AutoModelForCausalLM.from_pretrained(
+        model_id,
+        torch_dtype=torch.float16,
+        low_cpu_mem_usage=True
+    )
+    
+    model_mistral = model_mistral.to("cuda")
+
+    model_mistral = torch.compile(model=model_mistral)
+
+    inputs.to("cuda")
+    outputs = model_mistral.generate(**inputs, max_new_tokens=100)
+    
+    result_ = tokenizer.decode(outputs[0])
+
+    result_dict = str(result_).split("<|assistant|>")[-1]
+
+    result_dict_ = str(result_dict).split("<|end|>")[0]
+
+    if "json" in result_dict_ and "```" in result_dict_:
+        result_intermediate = result_dict_.split("json")[1]
+        result_final = result_intermediate.split("```")[0]
+        
+    else:
+        result_final = result_dict_    
+
+    print(result_final)
+
+    return result_final
 
 DATASET_FOLDER = "../dataset/"
 TRAIN_IMAGE_PATH = "/data/.jyotin/AmazonMLChallenge24/student_resource 3/images_train/"
 
 train = pd.read_csv(
-    os.path.join(DATASET_FOLDER, 'train_local.csv')
+    os.path.join(DATASET_FOLDER, 'test_local.csv')
 )
-
-sample_image = train["image_path"][1]
-sample_open = Image.open(sample_image)
-predict_out = train["entity_name"][1]
-
-print(sample_image)
 
 processor = LlavaNextProcessor.from_pretrained("llava-hf/llava-v1.6-mistral-7b-hf")
 
@@ -31,52 +123,55 @@ processor.tokenizer.padding_side = "left"
 model = LlavaNextForConditionalGeneration.from_pretrained(
     "llava-hf/llava-v1.6-mistral-7b-hf", 
     torch_dtype=torch.float16, 
-    low_cpu_mem_usage=True
+    low_cpu_mem_usage=True,
+    use_flash_attention_2=True
 ) 
 
 model.to("cuda:0")
 model = torch.compile(model=model)
 
-conversation = [
-    {
-        "role": "user",
-        "content": [
-            {"type": "image"},  # Ensure image is processed correctly if used
-            {"type": "text", "text": "Extract all the information."},
-        ],
-    },
-]
+predicted = []
+indexes = []
 
-# Apply the chat template and generate input tensors
-prompt = processor.apply_chat_template(conversation, add_generation_prompt=True)
-inputs = processor(prompt, sample_open, return_tensors="pt").to("cuda:0")
+for index in tqdm(range(len(train.index))):
+    sample_image = train["image_path"][index]
+    sample_open = Image.open(sample_image)
+    predict_out = train["entity_name"][index]
 
-# Generate the output using the model
-output = model.generate(**inputs, max_new_tokens=300)
+    indexes.append(index)
 
-# Decode the output
-decoded_output = processor.decode(output[0], skip_special_tokens=True)
+    print(sample_image)
 
-# Construct the next conversation without including an image, focusing on the text
-conversation_riyal = [
-    {
-        "role": "user",
-        "content": [
-            {"type": "text", "text": decoded_output},
-            {"type": "text", "text": f"Output the information relevant to {predict_out}, output in only 2 words"},
-        ],
-    },
-]
+    final_json = predict(
+        processor=processor, 
+        model=model, 
+        image_var=sample_open, 
+        predict_out=predict_out, 
+        entity_unit_map=entity_unit_map
+    )
 
-# Apply the chat template and generate input tensors for conversation_riyal
-prompt1 = processor.apply_chat_template(conversation_riyal, add_generation_prompt=True)
-inputs1 = processor(prompt1, return_tensors="pt").to("cuda:0")
+    try:
+        data = json.loads(final_json)
+        print("JSON parsed successfully:", data)
+        for key, val in data.items():
+            if check_number_type(key):
+                predicted.append(f"{val} {key}")
+            else:
+                predicted.append("")
+            break
+    except json.JSONDecodeError as e:
+        data = ""
+        predicted.append(data)
+        print("Error parsing JSON:", e)
+    
+    gc.collect()
+    torch.cuda.empty_cache()
 
-# Generate the second output
-output1 = model.generate(**inputs1, max_new_tokens=300)
+    if index == 10:
+        break
 
-# Decode the second output
-decoded_output1 = processor.decode(output1[0], skip_special_tokens=True)
+new_df = pd.DataFrame()
+new_df["index"] = indexes
+new_df["prediction"] = predicted
 
-# Print the final output
-print(decoded_output1)
+new_df.to_csv("../dataset/test_out.csv", index=False)

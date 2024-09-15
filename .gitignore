@@ -4,6 +4,7 @@ ml_challenge/
 images_train/
 image_test/
 image_test_sample/
+*.gguf
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

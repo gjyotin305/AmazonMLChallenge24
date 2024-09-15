@@ -54,7 +54,7 @@ To run the image prediction and processing pipeline:
 2. Run the main script:
 
     ```bash
-    python main.py
+    python eval.py
     ```
 
    This script will process images and output predictions as defined in the code.

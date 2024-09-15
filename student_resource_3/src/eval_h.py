@@ -42,7 +42,7 @@ def predict(
             "role": "user",
             "content": [
                 {"type": "image"}, 
-                {"type": "text", "text": f"  Extract all product specifications from the image, including details like dimensions, weight, material, color, features, model number, manufacturer, and any other relevant technical information. Ensure that the text is accurately identified and categorized, ignoring any decorative elements or branding logos."},
+                {"type": "text", "text":  "Extract all product specifications from the image, including details like dimensions, weight, material, color, features, model number, manufacturer, and any other relevant technical information. Ensure that the text is accurately identified and categorized, ignoring any decorative elements or branding logos."},
             ],
         },
     ]
@@ -62,7 +62,17 @@ def predict(
     
     print(decoded_out)
 
-    prompt_model = f" \n {decoded_out} \nOutput the information relevant to {predict_out} in the text given above, output only information and integers should be upto 3 decimal places.Output only one answer in form of the proper unit mentioned in {entity_unit_map[predict_out]}. Output in json format with unit as key and value.If not found then output " ""
+    sample_format = """
+    ```json
+    {
+        "<unit>": "<value>"
+    }
+    ```
+    """
+
+    prompt_model = f""" \n {decoded_out} \nOutput the information relevant to {predict_out} in the text given above, output only information and numbers can be upto 3 decimal places.Output answer in form of the proper unit mentioned in {entity_unit_map[predict_out]}. Output in json format. \n
+    {sample_format}
+    """
 
     model_id = "microsoft/Phi-3-mini-4k-instruct"
     tokenizer = AutoTokenizer.from_pretrained("microsoft/Phi-3-mini-4k-instruct")
@@ -123,8 +133,7 @@ processor.tokenizer.padding_side = "left"
 model = LlavaNextForConditionalGeneration.from_pretrained(
     "llava-hf/llava-v1.6-mistral-7b-hf", 
     torch_dtype=torch.float16, 
-    low_cpu_mem_usage=True,
-    use_flash_attention_2=True
+    low_cpu_mem_usage=True
 ) 
 
 model.to("cuda:0")
@@ -154,7 +163,7 @@ for index in tqdm(range(len(train.index))):
         data = json.loads(final_json)
         print("JSON parsed successfully:", data)
         for key, val in data.items():
-            if check_number_type(key):
+            if check_number_type(str(val)):
                 predicted.append(f"{val} {key}")
             else:
                 predicted.append("")
@@ -167,7 +176,7 @@ for index in tqdm(range(len(train.index))):
     gc.collect()
     torch.cuda.empty_cache()
 
-    if index == 10:
+    if index == 1:
         break
 
 new_df = pd.DataFrame()

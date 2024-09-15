@@ -6,11 +6,29 @@ from ok import generate_mistral
 from utils import download_images
 from constants import entity_unit_map
 from typing import Dict
+import re
 from tqdm import tqdm
 import gc
 import json
 from PIL import Image
 from tqdm import tqdm
+
+def is_float(s):
+    return bool(re.match(r"^-?\d*(\.\d+)?$", s))
+
+
+def is_integer(s):
+    return bool(re.match(r"^-?\d+$", s))
+
+
+def check_number_type(s):
+    if is_integer(s):
+        return True
+    elif is_float(s):
+        return True
+    else:
+        return False
+
 
 def predict(
     processor,
@@ -133,7 +151,10 @@ for index in tqdm(range(len(train.index))):
         data = json.loads(final_json)
         print("JSON parsed successfully:", data)
         for key, val in data.items():
-            predicted.append(f"{val} {key}")
+            if check_number_type(val) and key in entity_unit_map[predict_out].keys():
+                predicted.append(f"{val} {key}")
+            else:
+                predicted.append("")
             break
     except json.JSONDecodeError as e:
         data = ""

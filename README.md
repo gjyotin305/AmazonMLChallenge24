@@ -106,5 +106,3 @@ Meet our team members:
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ---
-
-Feel free to adjust any sections as needed to better fit your project specifics.

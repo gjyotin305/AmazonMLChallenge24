@@ -91,6 +91,16 @@ We welcome contributions to improve the project! To contribute:
 
 Please follow the coding guidelines and ensure that your code is well-documented.
 
+## Team Members
+
+Meet our team members:
+
+1. Rhythm Baghel.
+2. Jyotin Goel.
+3. Harshiv Shah.
+4. Mehta Jay Kamalkumar.
+
+
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

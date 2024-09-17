@@ -87,7 +87,11 @@ The project utilizes the `LlavaNextForConditionalGeneration` model from Hugging 
 - **Model Name**: `llava-hf/llava-v1.6-mistral-7b-hf`
 - **Processor**: `LlavaNextProcessor`
 
-After we get the image description from LlavaNext, we then used a Phi3-Mini-4K Instruct, to further process the relevant text in a relevant json, which is then checked to ensure proper units and values are only allowed.
+After we get the image description from LlavaNext, we then used a 
+
+- **Model Name**: `Phi3-Mini-4K Instruct`, 
+
+to further process the relevant text in a relevant json, which is then checked to ensure proper units and values are only allowed.
 
 We load the model in float16 to ensure better execution speeds.
 

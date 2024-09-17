@@ -47,6 +47,18 @@ To set up the project locally, follow these steps:
 
 ## Usage
 
+To download the images run:
+
+```bash
+python student_resource_3/src/download_data.py
+```
+
+To further add the image path to the csv
+
+```bash
+python preprocess.py
+```
+
 To run the image prediction and processing pipeline:
 
 1. Ensure you have the dataset available at the specified paths or adjust the paths in the script accordingly.
@@ -75,21 +87,16 @@ The project utilizes the `LlavaNextForConditionalGeneration` model from Hugging 
 - **Model Name**: `llava-hf/llava-v1.6-mistral-7b-hf`
 - **Processor**: `LlavaNextProcessor`
 
+After we get the image description from LlavaNext, we then used a Phi3-Mini-4K Instruct, to further process the relevant text in a relevant json, which is then checked to ensure proper units and values are only allowed.
+
+We load the model in float16 to ensure better execution speeds.
+
+Our approach utilises only `10 sec` per image.
+
 ## Results
 
 Results of the predictions and analyses are printed to the console. Modify the script to save results to files or visualize them as needed.
 
-## Contributing
-
-We welcome contributions to improve the project! To contribute:
-
-1. Fork the repository.
-2. Create a new branch (`git checkout -b feature-branch`).
-3. Make your changes.
-4. Commit and push your changes.
-5. Create a pull request.
-
-Please follow the coding guidelines and ensure that your code is well-documented.
 
 ## Team Members
 
